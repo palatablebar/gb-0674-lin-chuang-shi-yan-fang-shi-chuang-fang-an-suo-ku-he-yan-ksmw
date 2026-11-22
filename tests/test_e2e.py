@@ -51,3 +51,51 @@ def test_custom_csv_snapshot_and_navigation(tmp_path,monkeypatch):
     assert repeated.status_code==200
     assert repeated.json()['manifest']['run_id']==rid
     assert repeated.json()['manifest']['sha256']==result['manifest']['sha256']
+
+def test_boundary_switch_creates_new_batch_and_keeps_old(tmp_path,monkeypatch):
+    c=client(tmp_path,monkeypatch)
+    a=c.post('/api/runs',json={'dataset':'clean'}).json()
+    b=c.post('/api/runs',json={'dataset':'clean','overrides':{'cutoff':'2026-11-18'}}).json()
+    rid_a,rid_b=a['manifest']['run_id'],b['manifest']['run_id']
+    assert rid_a!=rid_b
+    assert a['balance']['pending']==2 and a['balance']['status']=='可锁库'
+    assert b['balance']['pending']==0 and b['balance']['deviations']==2 and b['balance']['status']=='待处理'
+    kept=c.get('/api/runs/'+rid_a).json()
+    assert kept['context']['cutoff']=='2026-11-17' and kept['balance']['pending']==2
+    assert len(c.get('/api/runs').json())==2
+
+def test_rerun_keeps_frozen_boundary(tmp_path,monkeypatch):
+    c=client(tmp_path,monkeypatch)
+    a=c.post('/api/runs',json={'dataset':'clean'}).json()
+    c.post('/api/runs',json={'dataset':'clean','overrides':{'cutoff':'2026-11-18'}})
+    again=c.post('/api/runs/'+a['manifest']['run_id']+'/rerun',json={}).json()
+    assert again['manifest']['run_id']==a['manifest']['run_id']
+    assert again['context']['cutoff']=='2026-11-17' and again['balance']['pending']==2
+
+def test_boundary_switch_failure_restores_old(tmp_path,monkeypatch):
+    c=client(tmp_path,monkeypatch)
+    a=c.post('/api/runs',json={'dataset':'clean'}).json()
+    rid=a['manifest']['run_id']
+    failed=c.post('/api/runs',json={'dataset':'clean','overrides':{'cutoff':'11/17/2026'}})
+    assert failed.status_code==422 and failed.json()['code']=='BAD_CUTOFF'
+    history=c.get('/api/runs').json()
+    assert len(history)==1 and history[0]['id']==rid
+    kept=c.get('/api/runs/'+rid).json()
+    assert kept['context']['cutoff']=='2026-11-17'
+    assert kept['input_snapshot']['bytes_b64']==a['input_snapshot']['bytes_b64']
+
+def test_pages_show_scope_pending_and_blockers(tmp_path,monkeypatch):
+    c=client(tmp_path,monkeypatch)
+    run=c.post('/api/runs',json={}).json()
+    rid=run['manifest']['run_id']
+    for key in ('deviation','locking','archive'):
+        html=c.get('/'+key+'?run_id='+rid).text
+        assert '2026-11-17' in html and '待成熟' in html and 'PENDING_MATURITY' in html
+        assert 'MISSING_PRIMARY' in html
+    export=c.get('/api/export/'+rid)
+    assert export.status_code==200
+    import zipfile,io,json
+    z=zipfile.ZipFile(io.BytesIO(export.content))
+    manifest=json.loads(z.read('manifest.json'));evidence=json.loads(z.read('evidence.json'))
+    assert manifest['cutoff']=='2026-11-17'
+    assert len(evidence['pending'])==2 and evidence['balance']['blocked']==7

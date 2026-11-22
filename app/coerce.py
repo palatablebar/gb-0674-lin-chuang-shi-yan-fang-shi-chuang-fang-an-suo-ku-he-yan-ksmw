@@ -1,8 +1,14 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
 import unicodedata, re
 from app.config import SENTINELS
 from app.errors import BusinessError
+
+def caldate(value):
+    try:
+        return date.fromisoformat(str(value))
+    except (ValueError, TypeError):
+        raise BusinessError('BAD_CUTOFF', '截止日须为YYYY-MM-DD')
 
 def number(value, unit=''):
     text = unicodedata.normalize('NFKC', str(value)).strip()

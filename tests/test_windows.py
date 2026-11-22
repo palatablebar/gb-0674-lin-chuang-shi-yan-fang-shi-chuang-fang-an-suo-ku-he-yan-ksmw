@@ -1,7 +1,7 @@
 from app.modules.windows.rules import calculate
 
 def test_visits_complete_real(clean):
-    assert len(clean['windows'])==45
+    assert len(clean['windows'])==47
 def test_day_real(clean):
     assert clean['windows'][0]['day']==7
 def test_late_real(sample):

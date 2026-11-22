@@ -29,6 +29,7 @@
 | TRAP-15 | 检验单位换算 | 静默错算或证据丢失 | 以可复核规则显式处理 | `app/modules/protocol/rules.py` | `tests/test_protocol.py::test_unit_conversion_real` |
 | TRAP-23 | 访视窗末端 | 静默错算或证据丢失 | 以可复核规则显式处理 | `app/modules/windows/rules.py` | `tests/test_windows.py::test_half_open_end` |
 | TRAP-11 | UTC日历归一 | 静默错算或证据丢失 | 以可复核规则显式处理 | `app/modules/windows/rules.py` | `tests/test_windows.py::test_utc_day_equivalence` |
+| TRAP-26 | 未到期访视误判漏访 | 全量要求拖住交付，只看回传放过缺口 | 按截止日分已到期阻断与待成熟不阻断 | `app/modules/deviation/rules.py` | `tests/test_deviation.py::test_pending_maturity_real` |
 
 ## 对账规则
 
